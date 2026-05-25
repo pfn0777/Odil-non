@@ -52,11 +52,37 @@ async function sendMessage(botToken, chatId, payload) {
   }
 }
 
+async function saveOrder(supabaseUrl, supabaseKey, order) {
+  const res = await fetch(`${supabaseUrl}/rest/v1/orders`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`,
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(order),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase error: ${text}`);
+  }
+  const rows = await res.json();
+  return rows[0];
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const BOT_TOKEN = process.env.BOT_TOKEN;
   const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_KEY = process.env.SUPABASE_KEY;
+
+  console.log('ENV check — BOT_TOKEN:', BOT_TOKEN ? 'set' : 'missing',
+    '| ADMIN_CHAT_ID:', ADMIN_CHAT_ID ? 'set' : 'missing',
+    '| SUPABASE_URL:', SUPABASE_URL ? 'set' : 'missing',
+    '| SUPABASE_KEY:', SUPABASE_KEY ? 'set' : 'missing');
 
   if (!BOT_TOKEN || !ADMIN_CHAT_ID) {
     console.error('BOT_TOKEN yoki ADMIN_CHAT_ID env yo\'q');
@@ -89,6 +115,26 @@ export default async function handler(req, res) {
   const { lines, total } = formatOrder(items);
   const totalFormatted = total.toLocaleString('ru') + ' so\'m';
 
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error('CRITICAL: SUPABASE_URL yoki SUPABASE_KEY env yoq — order saqlanmadi!');
+    return res.status(500).json({ error: 'Supabase env sozlanmagan' });
+  }
+
+  try {
+    const saved = await saveOrder(SUPABASE_URL, SUPABASE_KEY, {
+      user_id: userId,
+      user_name: userName,
+      telegram_user: user.username ?? '',
+      items: items,
+      total: total,
+      status: 'pending_contact',
+    });
+    console.log('Order saved — id:', saved?.id, 'user_id:', userId);
+  } catch (err) {
+    console.error('Supabase saqlashda xato:', err.message, '| userId:', userId, '| items:', JSON.stringify(items));
+    return res.status(500).json({ error: 'Zakaz saqlanmadi, qayta urining' });
+  }
+
   const adminText =
     `🆕 Yangi zakaz!\n` +
     `👤 Ism: ${userLink}\n` +
@@ -96,7 +142,8 @@ export default async function handler(req, res) {
     `━━━━━━━━━━━━━━━\n` +
     `${lines}\n` +
     `━━━━━━━━━━━━━━━\n` +
-    `💰 Jami: ${totalFormatted}`;
+    `💰 Jami: ${totalFormatted}\n` +
+    `📱 Telefon: kutilmoqda...`;
 
   const userPayload = {
     text:

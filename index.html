@@ -736,7 +736,7 @@ body {
 <main class="content" id="menuContent"></main>
 
 <!-- TOAST -->
-<div class="toast" id="toast">🍞 Savatga qo'shildi</div>
+<div class="toast" id="toast"></div>
 
 <!-- CART BAR -->
 <div class="cart-bar" id="cartBar">
@@ -971,22 +971,15 @@ function sInc(k){add(k);renderSheet();}
 function sDec(k){dec(k);renderSheet();if(!count())closeCart();}
 
 // ── CHECKOUT ──────────────────────────────────────────────────────────
-async function checkout() {
+function checkout() {
   if(!count()) return;
   const items=Object.entries(cart).map(([k,q])=>({item_key:k,quantity:q}));
   haptic('heavy');
   try{
-    const res=await fetch('/api/order',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({initData:Telegram.WebApp.initData,items})
-    });
-    if(!res.ok) throw new Error(await res.text());
-    showToast("Buyurtma qabul qilindi!");
-    setTimeout(()=>Telegram.WebApp.close(),1500);
+    Telegram.WebApp.sendData(JSON.stringify(items));
   }catch(e){
     console.error('checkout error:',e);
-    showToast("Xatolik yuz berdi. Qaytadan urinib ko'ring.");
+    showToast("⚠️ Botdagi «📱 Nonlarni ko’rish» tugmasini bosib oching, so’ng qayta buyurtma bering.", 5000);
   }
 }
 
@@ -1008,11 +1001,12 @@ function setupObs() {
 
 // ── HELPERS ───────────────────────────────────────────────────────────
 let toastT;
-function showToast(){
+function showToast(msg, duration){
   const el=document.getElementById('toast');
+  el.textContent = msg || "🍞 Savatga qo'shildi";
   el.classList.add('show');
   clearTimeout(toastT);
-  toastT=setTimeout(()=>el.classList.remove('show'),1600);
+  toastT=setTimeout(()=>el.classList.remove('show'), duration || 1600);
 }
 function haptic(s){
   try{Telegram.WebApp.HapticFeedback.impactOccurred(s);}catch(e){}
