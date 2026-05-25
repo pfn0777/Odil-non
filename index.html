@@ -971,13 +971,23 @@ function sInc(k){add(k);renderSheet();}
 function sDec(k){dec(k);renderSheet();if(!count())closeCart();}
 
 // ── CHECKOUT ──────────────────────────────────────────────────────────
-function checkout() {
+async function checkout() {
   if(!count()) return;
   const items=Object.entries(cart).map(([k,q])=>({item_key:k,quantity:q}));
-  const data=JSON.stringify({action:"checkout",items});
   haptic('heavy');
-  try{Telegram.WebApp.sendData(data);}
-  catch(e){console.log('TEST:',JSON.parse(data));alert('Test rejim:\n'+data);}
+  try{
+    const res=await fetch('/api/order',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({initData:Telegram.WebApp.initData,items})
+    });
+    if(!res.ok) throw new Error(await res.text());
+    showToast("Buyurtma qabul qilindi!");
+    setTimeout(()=>Telegram.WebApp.close(),1500);
+  }catch(e){
+    console.error('checkout error:',e);
+    showToast("Xatolik yuz berdi. Qaytadan urinib ko'ring.");
+  }
 }
 
 // ── TABS & OBSERVER ───────────────────────────────────────────────────
