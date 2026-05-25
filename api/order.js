@@ -36,16 +36,19 @@ function formatOrder(items) {
   return { lines: lines.join('\n'), total };
 }
 
-async function sendMessage(botToken, chatId, text) {
+async function sendMessage(botToken, chatId, payload) {
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+  const body = typeof payload === 'string'
+    ? { chat_id: chatId, text: payload, parse_mode: 'HTML' }
+    : { chat_id: chatId, parse_mode: 'HTML', ...payload };
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Telegram API error: ${body}`);
+    const text = await res.text();
+    throw new Error(`Telegram API error: ${text}`);
   }
 }
 
@@ -95,18 +98,25 @@ export default async function handler(req, res) {
     `━━━━━━━━━━━━━━━\n` +
     `💰 Jami: ${totalFormatted}`;
 
-  const userText =
-    `✅ Zakaringiz qabul qilindi!\n` +
-    `━━━━━━━━━━━━━━━\n` +
-    `${lines}\n` +
-    `━━━━━━━━━━━━━━━\n` +
-    `Jami: ${totalFormatted}\n\n` +
-    `Tez orada siz bilan bogʻlanamiz! 🙏`;
+  const userPayload = {
+    text:
+      `Buyurtmangiz qabul qilindi!\n` +
+      `━━━━━━━━━━━━━━━\n` +
+      `${lines}\n` +
+      `━━━━━━━━━━━━━━━\n` +
+      `Jami: ${totalFormatted}\n\n` +
+      `Tasdiqlash uchun telefon raqamingizni yuboring:`,
+    reply_markup: {
+      keyboard: [[{ text: '📱 Raqamni ulashish', request_contact: true }]],
+      resize_keyboard: true,
+      one_time_keyboard: true,
+    },
+  };
 
   try {
     await Promise.all([
       sendMessage(BOT_TOKEN, ADMIN_CHAT_ID, adminText),
-      sendMessage(BOT_TOKEN, userId, userText),
+      sendMessage(BOT_TOKEN, userId, userPayload),
     ]);
   } catch (err) {
     console.error('Telegram xabar yuborishda xato:', err);
